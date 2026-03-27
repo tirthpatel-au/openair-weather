@@ -94,6 +94,8 @@ type MetricCardProps = {
   value: string
 }
 
+type WeatherMood = 'sunny' | 'rainy' | 'cloudy' | 'stormy' | 'snowy' | 'clear'
+
 const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY
 const storageKey = 'openair-theme'
 const featuredCities = ['Brisbane', 'Tokyo', 'London', 'New York']
@@ -170,6 +172,28 @@ const formatLocationLabel = ({
   country?: string
 }) => [name, state, country].filter(Boolean).join(', ')
 
+const getWeatherMood = (condition?: string): WeatherMood => {
+  const value = condition?.toLowerCase() ?? ''
+
+  if (value.includes('thunder')) {
+    return 'stormy'
+  }
+  if (value.includes('rain') || value.includes('drizzle')) {
+    return 'rainy'
+  }
+  if (value.includes('snow')) {
+    return 'snowy'
+  }
+  if (value.includes('cloud')) {
+    return 'cloudy'
+  }
+  if (value.includes('clear') || value.includes('sun')) {
+    return 'sunny'
+  }
+
+  return 'clear'
+}
+
 const MetricCard = ({ icon, label, value }: MetricCardProps) => (
   <div className="rounded-[1.4rem] border border-[var(--line)] bg-[var(--surface)] p-4">
     <div className="flex items-center gap-2 text-[var(--accent)]">{icon}</div>
@@ -219,6 +243,74 @@ const ForecastSkeleton = () => (
     </div>
   </div>
 )
+
+const WeatherAmbience = ({ mood }: { mood: WeatherMood }) => {
+  if (mood === 'rainy' || mood === 'stormy') {
+    return (
+      <div className="weather-ambience pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="weather-tint weather-tint-rain" />
+        {Array.from({ length: 32 }, (_, index) => (
+          <span
+            key={index}
+            className="rain-drop"
+            style={
+              {
+                left: `${(index * 3.1) % 100}%`,
+                animationDelay: `${(index % 8) * 0.18}s`,
+                animationDuration: `${0.95 + (index % 5) * 0.12}s`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+        {mood === 'stormy' ? <div className="lightning-flash" /> : null}
+      </div>
+    )
+  }
+
+  if (mood === 'sunny' || mood === 'clear') {
+    return (
+      <div className="weather-ambience pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="weather-tint weather-tint-sun" />
+        <div className="sun-glow" />
+        <div className="sun-orb" />
+      </div>
+    )
+  }
+
+  if (mood === 'cloudy') {
+    return (
+      <div className="weather-ambience pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="weather-tint weather-tint-cloud" />
+        <div className="cloud cloud-one" />
+        <div className="cloud cloud-two" />
+        <div className="cloud cloud-three" />
+      </div>
+    )
+  }
+
+  if (mood === 'snowy') {
+    return (
+      <div className="weather-ambience pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="weather-tint weather-tint-snow" />
+        {Array.from({ length: 24 }, (_, index) => (
+          <span
+            key={index}
+            className="snow-flake"
+            style={
+              {
+                left: `${(index * 4.2) % 100}%`,
+                animationDelay: `${(index % 7) * 0.25}s`,
+                animationDuration: `${3.8 + (index % 4) * 0.4}s`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
+    )
+  }
+
+  return null
+}
 
 const OpenAirLogo = () => (
   <div className="flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-[var(--accent-soft)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
@@ -411,6 +503,7 @@ const App = () => {
   const currentWeather = weather?.current
   const forecast = useMemo(() => weather?.forecast ?? [], [weather])
   const isBusy = loading || searching
+  const weatherMood = getWeatherMood(currentWeather?.weather[0]?.main)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -424,8 +517,9 @@ const App = () => {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)] transition-colors duration-500">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-6 sm:px-8 lg:px-10">
+    <main className="relative min-h-screen overflow-hidden bg-[var(--page-bg)] text-[var(--text-primary)] transition-colors duration-500">
+      <WeatherAmbience mood={weatherMood} />
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-6 sm:px-8 lg:px-10">
         <header className="mb-8 flex flex-col gap-5 rounded-[2rem] border border-[var(--line)] bg-[var(--panel)]/88 p-5 shadow-[var(--panel-shadow)] backdrop-blur md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <OpenAirLogo />
