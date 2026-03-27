@@ -1,6 +1,7 @@
 import axios from 'axios'
 import {
   CloudSun,
+  Compass,
   Droplets,
   LoaderCircle,
   MapPin,
@@ -9,6 +10,7 @@ import {
   SunMedium,
   Wind,
 } from 'lucide-react'
+import { GlobeExplorer } from './components/GlobeExplorer'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 
@@ -38,8 +40,17 @@ type ForecastDay = {
   weather: WeatherDescriptor[]
 }
 
+type LocationDetails = {
+  label: string
+  shortName: string
+  country?: string
+  state?: string
+  lat: number
+  lon: number
+}
+
 type WeatherState = {
-  location: Coordinates
+  location: LocationDetails
   timezoneLabel: string
   current: {
     temp: number
@@ -85,7 +96,6 @@ type MetricCardProps = {
 
 const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY
 const storageKey = 'openair-theme'
-
 const featuredCities = ['Brisbane', 'Tokyo', 'London', 'New York']
 
 const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' })
@@ -107,17 +117,18 @@ const createThemePreference = (): Theme => {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
+const formatCoordinates = (lat: number, lon: number) =>
+  `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`
+
 const getWeatherIcon = (iconCode: string) =>
   `https://openweathermap.org/img/wn/${iconCode}@2x.png`
-
-const formatLocation = ({ name, state, country }: Coordinates) =>
-  [name, state, country].filter(Boolean).join(', ')
 
 const toTimezoneLabel = (offsetInSeconds: number) => {
   const baseDate = new Date(Date.now() + offsetInSeconds * 1000)
   const parts = timezoneFormatter.formatToParts(baseDate)
+  const name = parts.find((part) => part.type === 'timeZoneName')?.value
 
-  return parts.find((part) => part.type === 'timeZoneName')?.value ?? `UTC ${offsetInSeconds / 3600}`
+  return name ?? `UTC ${offsetInSeconds / 3600}`
 }
 
 const groupForecastByDay = (items: ForecastListItem[]) => {
@@ -148,6 +159,16 @@ const groupForecastByDay = (items: ForecastListItem[]) => {
       }
     })
 }
+
+const formatLocationLabel = ({
+  name,
+  state,
+  country,
+}: {
+  name: string
+  state?: string
+  country?: string
+}) => [name, state, country].filter(Boolean).join(', ')
 
 const MetricCard = ({ icon, label, value }: MetricCardProps) => (
   <div className="rounded-[1.4rem] border border-[var(--line)] bg-[var(--surface)] p-4">
@@ -231,6 +252,7 @@ const OpenAirLogo = () => (
   </div>
 )
 
+
 const App = () => {
   const [theme, setTheme] = useState<Theme>('light')
   const [query, setQuery] = useState('Brisbane')
@@ -248,7 +270,92 @@ const App = () => {
     window.localStorage.setItem(storageKey, theme)
   }, [theme])
 
-  const fetchWeather = async (city: string, mode: 'initial' | 'search' = 'search') => {
+  const fetchWeatherByCoords = async (
+    lat: number,
+    lon: number,
+    options?: { mode?: 'initial' | 'search'; presetLocation?: Coordinates | null },
+  ) => {
+    if (!apiKey) {
+      setError('Add your OpenWeather API key in VITE_OPENWEATHER_API_KEY to load live weather.')
+      setLoading(false)
+      setSearching(false)
+      return
+    }
+
+    const mode = options?.mode ?? 'search'
+    if (mode === 'initial') {
+      setLoading(true)
+    } else {
+      setSearching(true)
+    }
+
+    setError(null)
+
+    try {
+      const [currentResponse, forecastResponse, reverseResponse] = await Promise.all([
+        axios.get<CurrentApiResponse>('https://api.openweathermap.org/data/2.5/weather', {
+          params: { lat, lon, units: 'metric', appid: apiKey },
+        }),
+        axios.get<ForecastApiResponse>('https://api.openweathermap.org/data/2.5/forecast', {
+          params: { lat, lon, units: 'metric', appid: apiKey },
+        }),
+        options?.presetLocation
+          ? Promise.resolve({ data: [options.presetLocation] })
+          : axios.get<Coordinates[]>('https://api.openweathermap.org/geo/1.0/reverse', {
+              params: { lat, lon, limit: 1, appid: apiKey },
+            }),
+      ])
+
+      const resolvedLocation = reverseResponse.data[0]
+      const location: LocationDetails = resolvedLocation
+        ? {
+            label: formatLocationLabel(resolvedLocation),
+            shortName: resolvedLocation.name,
+            country: resolvedLocation.country,
+            state: resolvedLocation.state,
+            lat,
+            lon,
+          }
+        : {
+            label: `Open water near ${formatCoordinates(lat, lon)}`,
+            shortName: 'Open water',
+            lat,
+            lon,
+          }
+
+      setWeather({
+        location,
+        timezoneLabel: toTimezoneLabel(currentResponse.data.timezone),
+        current: {
+          temp: currentResponse.data.main.temp,
+          humidity: currentResponse.data.main.humidity,
+          wind_speed: currentResponse.data.wind.speed,
+          weather: currentResponse.data.weather,
+        },
+        forecast: groupForecastByDay(forecastResponse.data.list),
+      })
+
+      setQuery(location.shortName)
+    } catch (requestError) {
+      if (
+        axios.isAxiosError(requestError) &&
+        (requestError.response?.status === 401 || requestError.response?.status === 403)
+      ) {
+        setError(
+          'OpenWeather rejected the request. If this key is brand new, wait a few minutes for activation and try again.',
+        )
+      } else if (requestError instanceof Error) {
+        setError(requestError.message)
+      } else {
+        setError('Something went wrong while loading the weather.')
+      }
+    } finally {
+      setLoading(false)
+      setSearching(false)
+    }
+  }
+
+  const fetchWeatherByCity = async (city: string, mode: 'initial' | 'search' = 'search') => {
     if (!apiKey) {
       setError('Add your OpenWeather API key in VITE_OPENWEATHER_API_KEY to load live weather.')
       setLoading(false)
@@ -282,58 +389,23 @@ const App = () => {
         throw new Error('City not found. Try a larger city name or include a country.')
       }
 
-      const [currentResponse, forecastResponse] = await Promise.all([
-        axios.get<CurrentApiResponse>('https://api.openweathermap.org/data/2.5/weather', {
-          params: {
-            lat: location.lat,
-            lon: location.lon,
-            units: 'metric',
-            appid: apiKey,
-          },
-        }),
-        axios.get<ForecastApiResponse>('https://api.openweathermap.org/data/2.5/forecast', {
-          params: {
-            lat: location.lat,
-            lon: location.lon,
-            units: 'metric',
-            appid: apiKey,
-          },
-        }),
-      ])
-
-      setWeather({
-        location,
-        timezoneLabel: toTimezoneLabel(currentResponse.data.timezone),
-        current: {
-          temp: currentResponse.data.main.temp,
-          humidity: currentResponse.data.main.humidity,
-          wind_speed: currentResponse.data.wind.speed,
-          weather: currentResponse.data.weather,
-        },
-        forecast: groupForecastByDay(forecastResponse.data.list),
+      await fetchWeatherByCoords(location.lat, location.lon, {
+        mode,
+        presetLocation: location,
       })
-      setQuery(location.name)
     } catch (requestError) {
-      if (
-        axios.isAxiosError(requestError) &&
-        (requestError.response?.status === 401 || requestError.response?.status === 403)
-      ) {
-        setError(
-          'OpenWeather rejected the request. If this key is brand new, wait a few minutes for activation and try again.',
-        )
-      } else if (requestError instanceof Error) {
+      if (requestError instanceof Error) {
         setError(requestError.message)
       } else {
         setError('Something went wrong while loading the weather.')
       }
-    } finally {
       setLoading(false)
       setSearching(false)
     }
   }
 
   useEffect(() => {
-    void fetchWeather('Brisbane', 'initial')
+    void fetchWeatherByCity('Brisbane', 'initial')
   }, [])
 
   const currentWeather = weather?.current
@@ -348,7 +420,7 @@ const App = () => {
       return
     }
 
-    await fetchWeather(city)
+    await fetchWeatherByCity(city)
   }
 
   return (
@@ -393,11 +465,11 @@ const App = () => {
                       Live conditions
                     </span>
                     <h2 className="mt-4 font-display text-4xl tracking-[-0.06em] sm:text-5xl">
-                      Minimal weather, in real time.
+                      Search cities or tap the Earth.
                     </h2>
                     <p className="mt-4 max-w-lg text-base leading-7 text-[var(--text-soft)]">
-                      Search any city, check the current temperature instantly, and scan a clean
-                      daily forecast without digging through clutter.
+                      Explore weather by city name or choose any visible point on the globe to load
+                      live conditions for that exact area.
                     </p>
                   </div>
 
@@ -437,7 +509,7 @@ const App = () => {
                       type="button"
                       onClick={() => {
                         setQuery(city)
-                        void fetchWeather(city)
+                        void fetchWeatherByCity(city)
                       }}
                       className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-soft)] transition duration-300 hover:border-[var(--accent)] hover:text-[var(--accent)]"
                     >
@@ -448,6 +520,13 @@ const App = () => {
               </div>
             </section>
 
+            <GlobeExplorer
+              activeLocation={weather?.location}
+              disabled={isBusy}
+              onSelect={(lat, lon) => {
+                void fetchWeatherByCoords(lat, lon)
+              }}
+            />
             {error ? (
               <section className="rounded-[2rem] border border-[var(--danger-line)] bg-[var(--danger-bg)] p-6 text-[var(--danger-text)] shadow-[var(--panel-shadow)]">
                 <h3 className="font-display text-2xl tracking-[-0.04em]">Live weather is waiting</h3>
@@ -470,7 +549,7 @@ const App = () => {
                     <div>
                       <div className="flex items-center gap-2 text-sm text-[var(--text-soft)]">
                         <MapPin size={16} />
-                        {formatLocation(weather.location)}
+                        {weather.location.label}
                       </div>
                       <h3 className="mt-4 font-display text-6xl tracking-[-0.08em] sm:text-7xl">
                         {Math.round(currentWeather.temp)}&deg;
@@ -489,7 +568,7 @@ const App = () => {
                     </div>
                   </div>
 
-                  <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                  <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <MetricCard
                       icon={<Droplets size={18} />}
                       label="Humidity"
@@ -505,6 +584,11 @@ const App = () => {
                       label="Condition"
                       value={currentWeather.weather[0]?.main ?? 'Clear'}
                     />
+                    <MetricCard
+                      icon={<Compass size={18} />}
+                      label="Coordinates"
+                      value={formatCoordinates(weather.location.lat, weather.location.lon)}
+                    />
                   </div>
                 </article>
 
@@ -516,8 +600,8 @@ const App = () => {
                     The days ahead
                   </h3>
                   <p className="mt-3 text-sm leading-7 text-[var(--text-soft)]">
-                    OpenWeather free plans provide current weather plus a 5-day forecast, so this view
-                    stays fully compatible with your key.
+                    Search a city or touch the globe to inspect weather for neighborhoods, coastlines,
+                    islands, and even open-water points.
                   </p>
 
                   <div className="mt-6 space-y-3">
