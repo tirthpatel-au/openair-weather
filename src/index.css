@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Manrope', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  --page-bg: #f4f8fb;
+  --panel: rgba(255, 255, 255, 0.78);
+  --surface: rgba(255, 255, 255, 0.94);
+  --hero-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(231, 244, 250, 0.96));
+  --line: rgba(95, 129, 147, 0.16);
+  --text-primary: #15313d;
+  --text-soft: #5f7786;
+  --text-faint: #8fa5b3;
+  --accent: #1197be;
+  --accent-soft: rgba(17, 151, 190, 0.12);
+  --danger-bg: rgba(255, 240, 240, 0.85);
+  --danger-line: rgba(218, 97, 97, 0.18);
+  --danger-text: #b14545;
+  --skeleton: rgba(95, 119, 134, 0.12);
+  --panel-shadow: 0 30px 80px rgba(34, 77, 96, 0.08);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page-bg: #08141b;
+  --panel: rgba(9, 23, 31, 0.82);
+  --surface: rgba(13, 31, 40, 0.92);
+  --hero-bg: linear-gradient(145deg, rgba(15, 31, 40, 0.98), rgba(9, 20, 27, 0.96));
+  --line: rgba(126, 168, 187, 0.14);
+  --text-primary: #edf6fa;
+  --text-soft: #8ba7b7;
+  --text-faint: #65808f;
+  --accent: #5ac6e8;
+  --accent-soft: rgba(90, 198, 232, 0.14);
+  --danger-bg: rgba(77, 30, 30, 0.55);
+  --danger-line: rgba(224, 117, 117, 0.18);
+  --danger-text: #ffb1b1;
+  --skeleton: rgba(139, 167, 183, 0.16);
+  --panel-shadow: 0 30px 90px rgba(0, 0, 0, 0.38);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(90, 198, 232, 0.12), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(72, 134, 255, 0.08), transparent 32%),
+    var(--page-bg);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+#app {
+  min-height: 100vh;
+}
