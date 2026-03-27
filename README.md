@@ -2,6 +2,10 @@
 
 OpenAir is a minimal weather dashboard built with React, TypeScript, Vite, Tailwind CSS, Axios, and the OpenWeather API. It lets you search cities, view current conditions, check a multi-day forecast, and switch between light and dark mode.
 
+## Live Demo
+
+[OpenAir Live Demo](https://tirthpatel-au.github.io/openair-weather/)
+
 ## Features
 
 - Live city search with OpenWeather geocoding
@@ -93,6 +97,7 @@ Previews the production build locally.
 - OpenWeather free accounts support current weather and 5-day forecast endpoints.
 - Brand-new API keys can take a few minutes to activate.
 - `.env` is ignored from Git so your real API key stays local.
+- For GitHub Pages, add a repository secret named `VITE_OPENWEATHER_API_KEY` before the deploy workflow runs.
 
 ## License
 
