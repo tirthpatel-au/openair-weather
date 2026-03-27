@@ -10,7 +10,7 @@ import {
   SunMedium,
   Wind,
 } from 'lucide-react'
-import { GlobeExplorer } from './components/GlobeExplorer'
+import { InteractiveMap } from './components/InteractiveMap'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 
@@ -520,7 +520,7 @@ const App = () => {
               </div>
             </section>
 
-            <GlobeExplorer
+            <InteractiveMap
               activeLocation={weather?.location}
               disabled={isBusy}
               onSelect={(lat, lon) => {
